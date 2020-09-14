@@ -12,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	exec "github.com/nevercase/k8s-exec-pod"
 )
@@ -29,22 +30,36 @@ func main() {
 	flag.Parse()
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
-	s := &Service{}
+	s := &Service{ctx: context.Background()}
 	token, err := getToken(addr)
 	if err != nil {
 		klog.Fatal(err)
 	}
+	//klog.Fatal(token)
 	c, err := s.newClient(addr, token)
 	if err != nil {
 		log.Panic(err)
 	}
-	_ = c
+	s.c = c
+	//c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "pwd"}
+	c.writeChan <- exec.XtermMsg{MsgType: "resize", Rows: 100, Cols: 100}
+	time.Sleep(time.Second * 2)
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "pwd\n"}
+	//c.writeChan <- exec.XtermMsg{MsgType: "resize", Rows: 100, Cols: 100}
+	time.Sleep(time.Second * 2)
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "ls -al\n"}
+	//c.writeChan <- exec.XtermMsg{MsgType: "resize", Rows: 100, Cols: 100}
+	//for {
+	//	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "ls -al"}
+	//	time.Sleep(time.Second * 5)
+	//	//break
+	//}
 	<-stopCh
 }
 
 func getToken(addr string) (string, error) {
-	url := fmt.Sprintf("http://%s/pod/develop/hso-develop-campaign-0/shell/hso-develop-campaign/bash", addr)
-	res, err := http.Get(url)
+	requestUrl := fmt.Sprintf("http://%s/namespace/develop/pod/hso-develop-campaign-0/shell/hso-develop-campaign/bash", addr)
+	res, err := http.Get(requestUrl)
 	if err != nil {
 		klog.V(2).Infof("http err:", err)
 		return "", err
@@ -60,24 +75,24 @@ func getToken(addr string) (string, error) {
 		klog.V(2).Infof("http err:", err)
 		return "", err
 	}
-	var resoult exec.HttpResponse
-	if err := json.Unmarshal(cot, &resoult); err != nil {
+	var result exec.HttpResponse
+	if err := json.Unmarshal(cot, &result); err != nil {
 		klog.V(2).Infof("http err:", err)
 		return "", err
 	}
-	klog.Info(url)
-	klog.Info("token:", resoult.Token)
-	return resoult.Token, nil
+	klog.Info(requestUrl)
+	klog.Info("token:", result.Token)
+	return result.Token, nil
 }
 
 type Service struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+	c      *Client
 }
 
 type Client struct {
 	ws        *websocket.Conn
-	teams     map[string]string
 	writeChan chan interface{}
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -90,7 +105,7 @@ func (s *Service) newClient(addr, token string) (c *Client, err error) {
 	if ws, err = s.conn(addr, token); err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(s.ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	c = &Client{
 		ws:        ws,
 		writeChan: make(chan interface{}),
@@ -99,7 +114,7 @@ func (s *Service) newClient(addr, token string) (c *Client, err error) {
 	}
 	go func() {
 		if err = s.readPump(c); err != nil {
-			log.Println(err)
+			klog.V(2).Info(err)
 		}
 	}()
 	go func() {
@@ -112,9 +127,10 @@ func (s *Service) newClient(addr, token string) (c *Client, err error) {
 
 func (s *Service) conn(addr, token string) (ws *websocket.Conn, err error) {
 	u := url.URL{Scheme: "ws", Host: addr, Path: fmt.Sprintf("/ssh/%s", token)}
-	log.Println("url:", u)
+	klog.Info("url:", u)
 	a, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {
+		klog.V(2).Info(err)
 		return nil, err
 	}
 	return a, nil
@@ -123,7 +139,7 @@ func (s *Service) conn(addr, token string) (ws *websocket.Conn, err error) {
 func (s *Service) readPump(c *Client) (err error) {
 	for {
 		messageType, message, err := c.ws.ReadMessage()
-		log.Printf("messageType: %d message: %s  err: %s\n", messageType, string(message), err)
+		klog.Infof("messageType: %d message: %s  err: %s\n", messageType, string(message), err)
 		if err != nil {
 			return nil
 		}
@@ -134,8 +150,10 @@ func (s *Service) writePump(c *Client) (err error) {
 	for {
 		select {
 		case <-c.ctx.Done():
+			klog.Info("ctx donw")
 			return
 		case msg := <-c.writeChan:
+			klog.Info("writePump get msg:", msg)
 			if err = c.ws.WriteJSON(msg); err != nil {
 				return err
 			}

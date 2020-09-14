@@ -68,7 +68,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Http {
 	router := gin.New()
 	//router.Use(gin.LoggerWithConfig(gin.LoggerConfig{Output: writer}), gin.RecoveryWithWriter(writer))
 	router.Use(header())
-	router.GET("/pod/:namespace/:pod/shell/:container/:cmd", func(c *gin.Context) {
+	router.GET("/namespace/:namespace/pod/:pod/shell/:container/:command", func(c *gin.Context) {
 		var res HttpResponse
 		session, err := genTerminalSessionId()
 		if err != nil {
@@ -87,9 +87,9 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Http {
 			Namespace:     c.Param("namespace"),
 			PodName:       c.Param("pod"),
 			ContainerName: c.Param("container"),
-			Command:       []string{c.Param("cmd")},
+			Command:       []string{c.Param("command")},
 		}
-		klog.Info(option)
+		klog.Infof("Namespace:%s PodName:%s ContainerName:%s Command:%v", option.Namespace, option.PodName, option.ContainerName, option.Command)
 		go WaitForTerminal(h.k8sClient, h.cfg, option, session)
 		c.JSON(http.StatusOK, res)
 	})

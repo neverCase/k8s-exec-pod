@@ -1,7 +1,6 @@
 package k8s_exec_pod
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -54,13 +53,12 @@ const (
 )
 
 type proxy struct {
-	conn        *websocket.Conn
-	status      proxyStatus
-	readChan    chan *message
-	writeChan   chan *message
-	inputBuffer bytes.Buffer
-	closeOnce   sync.Once
-	ctx         context.Context
+	conn      *websocket.Conn
+	status    proxyStatus
+	readChan  chan *message
+	writeChan chan *message
+	closeOnce sync.Once
+	ctx       context.Context
 }
 
 type message struct {
@@ -72,6 +70,7 @@ func (p *proxy) ReadPump() {
 	defer p.Close()
 	for {
 		messageType, data, err := p.conn.ReadMessage()
+		klog.Info("data:", data)
 		klog.Infof("messageType: %d message: %v err: %s\n", messageType, data, err)
 		if err != nil {
 			klog.V(2).Info(err)
@@ -98,6 +97,7 @@ func (p *proxy) WritePump() {
 			if !isClose {
 				return
 			}
+			klog.Info("proxy WritePump msg-data:", string(msg.data))
 			if err := p.conn.WriteMessage(msg.messageType, msg.data); err != nil {
 				klog.V(2).Info(err)
 				return
@@ -109,6 +109,7 @@ func (p *proxy) WritePump() {
 }
 
 func (p *proxy) Close() {
+	klog.Info("proxy close")
 	p.closeOnce.Do(func() {
 		if p.status == proxyClose {
 			return
@@ -123,11 +124,14 @@ func (p *proxy) Close() {
 }
 
 func (p *proxy) Recv() (*message, error) {
+	klog.Info("proxy Recv message")
 	select {
 	case msg, isClose := <-p.readChan:
-		if isClose {
+		if !isClose {
 			return nil, fmt.Errorf("readChan closed")
 		}
+		klog.Info("proxy recv-msg:", msg)
+		klog.Info("proxy recv-data-string:", string(msg.data))
 		return msg, nil
 	case <-p.ctx.Done():
 		return nil, fmt.Errorf("proxy ctx cancel")
@@ -135,6 +139,7 @@ func (p *proxy) Recv() (*message, error) {
 }
 
 func (p *proxy) Send(messageType int, data []byte) error {
+	klog.Infof("proxy send messageType:%v data:%v", messageType, string(data))
 	select {
 	case p.writeChan <- &message{messageType: messageType, data: data}:
 		return nil

@@ -7,15 +7,14 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"io"
-	"k8s.io/klog"
 	"sync"
 
-	"gopkg.in/igm/sockjs-go.v2/sockjs"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
+	"k8s.io/klog"
 )
 
 // ExecOptions passed to ExecWithOptions
@@ -44,7 +43,6 @@ type PtyHandler interface {
 type TerminalSession struct {
 	id               string
 	bound            chan error
-	sockJSSession    sockjs.Session
 	websocketSession Proxy
 	sizeChan         chan remotecommand.TerminalSize
 	doneChan         chan struct{}
@@ -67,10 +65,12 @@ type TerminalMessage struct {
 // TerminalSize handles pty->process resize events
 // Called in a loop from remotecommand as long as the process is running
 func (t TerminalSession) Next() *remotecommand.TerminalSize {
+	klog.Info("Next")
 	select {
 	case size := <-t.sizeChan:
 		return &size
 	case <-t.doneChan:
+		klog.Info("TerminalSession Next doneCHan")
 		return nil
 	}
 }
@@ -78,25 +78,17 @@ func (t TerminalSession) Next() *remotecommand.TerminalSize {
 // Read handles pty->process messages (stdin, resize)
 // Called in a loop from remotecommand as long as the process is running
 func (t TerminalSession) Read(p []byte) (int, error) {
-	//m, err := t.sockJSSession.Recv()
-	//if err != nil {
-	//	// Send terminated signal to process to avoid resource leak
-	//	return copy(p, EndOfTransmission), err
-	//}
-
+	klog.Info("TerminalSession Read p:", string(p))
 	var wsMsg *message
 	var err error
 	if wsMsg, err = t.websocketSession.Recv(); err != nil {
+		klog.V(2).Info(err)
 		return 0, err
 	}
 
-	//var msg TerminalMessage
-	//if err := json.Unmarshal([]byte(m), &msg); err != nil {
-	//	return copy(p, EndOfTransmission), err
-	//}
-
 	var msg XtermMsg
 	if err := json.Unmarshal(wsMsg.data, &msg); err != nil {
+		klog.V(2).Info(err)
 		return copy(p, EndOfTransmission), err
 	}
 
@@ -109,32 +101,13 @@ func (t TerminalSession) Read(p []byte) (int, error) {
 	default:
 		return copy(p, EndOfTransmission), fmt.Errorf("unknown message type '%s'", msg.MsgType)
 	}
-	//switch msg.Op {
-	//case "stdin":
-	//	return copy(p, msg.Data), nil
-	//case "resize":
-	//	t.sizeChan <- remotecommand.TerminalSize{Width: msg.Cols, Height: msg.Rows}
-	//	return 0, nil
-	//default:
-	//	return copy(p, EndOfTransmission), fmt.Errorf("unknown message type '%s'", msg.Op)
-	//}
 }
 
 // Write handles process->pty stdout
 // Called from remotecommand whenever there is any output
 func (t TerminalSession) Write(p []byte) (int, error) {
-	//msg, err := json.Marshal(TerminalMessage{
-	//	Op:   "stdout",
-	//	Data: string(p),
-	//})
-	//if err != nil {
-	//	return 0, err
-	//}
-
-	//if err = t.sockJSSession.Send(string(msg)); err != nil {
-	//	return 0, err
-	//}
 	if err := t.websocketSession.Send(websocket.BinaryMessage, p); err != nil {
+		klog.V(2).Info(err)
 		return 0, err
 	}
 	return len(p), nil
@@ -143,19 +116,9 @@ func (t TerminalSession) Write(p []byte) (int, error) {
 // Toast can be used to send the user any OOB messages
 // hterm puts these in the center of the terminal
 func (t TerminalSession) Toast(p string) error {
-	//msg, err := json.Marshal(TerminalMessage{
-	//	Op:   "toast",
-	//	Data: p,
-	//})
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//if err = t.sockJSSession.Send(string(msg)); err != nil {
-	//	return err
-	//}
-
+	klog.Info("Toast")
 	if err := t.websocketSession.Send(websocket.BinaryMessage, []byte(p)); err != nil {
+		klog.V(2).Info(err)
 		return err
 	}
 	return nil
@@ -204,10 +167,9 @@ func handleTerminalSession(token string, websocketProxy Proxy) {
 	var (
 		//buf             string
 		//err             error
-		msg             TerminalMessage
+		//msg             TerminalMessage
 		terminalSession TerminalSession
 	)
-
 	//if buf, err = session.Recv(); err != nil {
 	//	log.Printf("handleTerminalSession: can't Recv: %v", err)
 	//	return
@@ -224,13 +186,13 @@ func handleTerminalSession(token string, websocketProxy Proxy) {
 	//}
 
 	if terminalSession = terminalSessions.Get(token); terminalSession.id == "" {
-		klog.V(2).Infof("handleTerminalSession: can't find session '%s'", msg.SessionID)
+		klog.V(2).Infof("handleTerminalSession: can't find session '%s'", token)
 		return
 	}
 
 	//terminalSession.sockJSSession = session
 	terminalSession.websocketSession = websocketProxy
-	terminalSessions.Set(msg.SessionID, terminalSession)
+	terminalSessions.Set(token, terminalSession)
 	terminalSession.bound <- nil
 }
 
@@ -243,12 +205,14 @@ func handleTerminalSession(token string, websocketProxy Proxy) {
 // startProcess is called by handleAttach
 // Executed cmd in the container specified in request and connects it up with the ptyHandler (a session)
 func startProcess(k8sClient kubernetes.Interface, cfg *rest.Config, option ExecOptions, ptyHandler PtyHandler) error {
+	klog.Infof("startProcess Namespace:%s PodName:%s ContainerName:%s Command:%v", option.Namespace, option.PodName, option.ContainerName, option.Command)
 	req := k8sClient.CoreV1().RESTClient().Post().
 		Resource("pods").
-		Name(option.Namespace).
-		Namespace(option.PodName).
-		SubResource(option.ContainerName)
+		Name(option.PodName).
+		Namespace(option.Namespace).
+		SubResource("exec")
 
+	klog.Info("cmd:", option.Command)
 	req.VersionedParams(&corev1.PodExecOptions{
 		Container: option.ContainerName,
 		Command:   option.Command,
@@ -258,11 +222,15 @@ func startProcess(k8sClient kubernetes.Interface, cfg *rest.Config, option ExecO
 		TTY:       true,
 	}, scheme.ParameterCodec)
 
+	klog.Info("url:", req.URL())
+
 	exec, err := remotecommand.NewSPDYExecutor(cfg, "POST", req.URL())
 	if err != nil {
+		klog.V(2).Info(err)
 		return err
 	}
 
+	//var stdout, stderr bytes.Buffer
 	err = exec.Stream(remotecommand.StreamOptions{
 		Stdin:             ptyHandler,
 		Stdout:            ptyHandler,
@@ -271,8 +239,11 @@ func startProcess(k8sClient kubernetes.Interface, cfg *rest.Config, option ExecO
 		Tty:               true,
 	})
 	if err != nil {
+		klog.V(2).Info(err)
 		return err
 	}
+
+	//klog.Info(stdout.String(), stderr.String())
 
 	return nil
 }
@@ -293,6 +264,7 @@ func genTerminalSessionId() (string, error) {
 
 // isValidShell checks if the shell is an allowed one
 func isValidShell(validShells []string, shell string) bool {
+	klog.Info("isValidShell:", shell)
 	for _, validShell := range validShells {
 		if validShell == shell {
 			return true
@@ -314,8 +286,10 @@ func WaitForTerminal(k8sClient kubernetes.Interface, cfg *rest.Config, option Ex
 		validShells := []string{"bash", "sh", "powershell", "cmd"}
 
 		if isValidShell(validShells, option.Command[0]) {
+			klog.Info(3333333)
 			err = startProcess(k8sClient, cfg, option, terminalSessions.Get(sessionId))
 		} else {
+			klog.Info(44444)
 			// No shell given or it was not valid: try some shells until one succeeds or all fail
 			// FIXME: if the first shell fails then the first keyboard event is lost
 			for _, testShell := range validShells {
@@ -328,10 +302,12 @@ func WaitForTerminal(k8sClient kubernetes.Interface, cfg *rest.Config, option Ex
 		}
 
 		if err != nil {
+			klog.Info(11111111)
+			klog.V(2).Info(err)
 			terminalSessions.Close(sessionId, 2, err.Error())
 			return
 		}
-
+		klog.Info(2222222)
 		terminalSessions.Close(sessionId, 1, "Process exited")
 	}
 }
