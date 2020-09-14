@@ -32,13 +32,6 @@ type ExecOptions struct {
 
 const EndOfTransmission = "\u0004"
 
-// PtyHandler is what remotecommand expects from a pty
-type PtyHandler interface {
-	io.Reader
-	io.Writer
-	remotecommand.TerminalSizeQueue
-}
-
 // TerminalSession implements PtyHandler (using a SockJS connection)
 type TerminalSession struct {
 	id               string
@@ -79,6 +72,13 @@ func (t TerminalSession) Next() *remotecommand.TerminalSize {
 // Called in a loop from remotecommand as long as the process is running
 func (t TerminalSession) Read(p []byte) (int, error) {
 	klog.Info("TerminalSession Read p:", string(p))
+	if n, err := t.websocketSession.LoadBuffers(p); err != nil {
+		return 0, err
+	} else {
+		if n > 0 {
+			return n, nil
+		}
+	}
 	var wsMsg *message
 	var err error
 	if wsMsg, err = t.websocketSession.Recv(); err != nil {
@@ -97,7 +97,7 @@ func (t TerminalSession) Read(p []byte) (int, error) {
 		t.sizeChan <- remotecommand.TerminalSize{Width: msg.Cols, Height: msg.Rows}
 		return 0, nil
 	case XtermMsgTypeInput:
-		return copy(p, msg.Input), nil
+		return t.websocketSession.HandleInput(p, []byte(msg.Input))
 	default:
 		return copy(p, EndOfTransmission), fmt.Errorf("unknown message type '%s'", msg.MsgType)
 	}
@@ -150,10 +150,6 @@ func (sm *SessionMap) Set(sessionId string, session TerminalSession) {
 func (sm *SessionMap) Close(sessionId string, status uint32, reason string) {
 	sm.Lock.Lock()
 	defer sm.Lock.Unlock()
-	//err := sm.Sessions[sessionId].sockJSSession.Close(status, reason)
-	//if err != nil {
-	//	log.Println(err)
-	//}
 	if _, ok := sm.Sessions[sessionId]; ok {
 		sm.Sessions[sessionId].websocketSession.Close()
 	}
@@ -190,7 +186,7 @@ func handleTerminalSession(token string, websocketProxy Proxy) {
 		return
 	}
 
-	//terminalSession.sockJSSession = session
+	//todo bug: line 196 send on closed channel
 	terminalSession.websocketSession = websocketProxy
 	terminalSessions.Set(token, terminalSession)
 	terminalSession.bound <- nil

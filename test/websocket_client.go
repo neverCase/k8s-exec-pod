@@ -44,10 +44,14 @@ func main() {
 	//c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "pwd"}
 	c.writeChan <- exec.XtermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
-	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "pwd\n"}
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "pw"}
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "w"}
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "d"}
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "\n"}
 	//c.writeChan <- exec.XtermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
-	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "ls -al\n"}
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "ls -al"}
+	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "\n"}
 	//c.writeChan <- exec.XtermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	//for {
 	//	c.writeChan <- exec.XtermMsg{MsgType: "input", Input: "ls -al"}

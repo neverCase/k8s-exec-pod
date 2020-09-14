@@ -1,6 +1,7 @@
 package k8s_exec_pod
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -25,6 +26,8 @@ type Proxy interface {
 	Close()
 	Recv() (*message, error)
 	Send(messageType int, data []byte) error
+	LoadBuffers(buf []byte) (n int, err error)
+	HandleInput(buf []byte, appendBuf []byte) (n int, err error)
 }
 
 func NewProxy(ctx context.Context, w http.ResponseWriter, r *http.Request) (Proxy, error) {
@@ -53,12 +56,13 @@ const (
 )
 
 type proxy struct {
-	conn      *websocket.Conn
-	status    proxyStatus
-	readChan  chan *message
-	writeChan chan *message
-	closeOnce sync.Once
-	ctx       context.Context
+	conn         *websocket.Conn
+	status       proxyStatus
+	readChan     chan *message
+	writeChan    chan *message
+	inputBuffers bytes.Buffer
+	closeOnce    sync.Once
+	ctx          context.Context
 }
 
 type message struct {
@@ -146,4 +150,17 @@ func (p *proxy) Send(messageType int, data []byte) error {
 	case <-p.ctx.Done():
 		return fmt.Errorf("proxy ctx cancel")
 	}
+}
+
+func (p *proxy) LoadBuffers(buf []byte) (n int, err error) {
+	if p.inputBuffers.Len() > 0 {
+		n = copy(buf, p.inputBuffers.Bytes())
+		p.inputBuffers.Next(n)
+	}
+	return n, nil
+}
+
+func (p *proxy) HandleInput(buf []byte, appendBuf []byte) (n int, err error) {
+	p.inputBuffers.Write(appendBuf)
+	return p.LoadBuffers(buf)
 }
