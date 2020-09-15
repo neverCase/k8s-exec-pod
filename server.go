@@ -87,6 +87,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 		c.JSON(http.StatusOK, res)
 	})
 	router.GET("/ssh/:token", h.SSH)
+	router.GET("/log/:token", h.Log)
 	h.server = &http.Server{
 		Addr:    addr,
 		Handler: router,
@@ -125,4 +126,20 @@ func (s *Server) SSH(c *gin.Context) {
 		return
 	}
 	session.HandleProxy(proxy)
+}
+
+func (s *Server) Log(c *gin.Context) {
+	token := c.Param("token")
+	klog.Info("Log token:", token)
+	proxy, err := NewProxy(context.Background(), c.Writer, c.Request)
+	if err != nil {
+		klog.V(2).Info(err)
+		return
+	}
+	session, err := s.sessionHub.Get(token)
+	if err != nil {
+		klog.V(2).Info(err)
+		return
+	}
+	go session.HandleLog(proxy)
 }

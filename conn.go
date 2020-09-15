@@ -25,6 +25,8 @@ type Proxy interface {
 	WritePump()
 	Close()
 	Recv() (*message, error)
+	KeepAlive()
+	HandlePing()
 	Send(messageType int, data []byte) error
 	LoadBuffers(buf []byte) (n int, err error)
 	HandleInput(buf []byte, appendBuf []byte) (n int, err error)
@@ -37,14 +39,17 @@ func NewProxy(ctx context.Context, w http.ResponseWriter, r *http.Request) (Prox
 		return nil, err
 	}
 	p := &proxy{
-		conn:      conn,
-		status:    proxyAlive,
-		readChan:  make(chan *message, 4096),
-		writeChan: make(chan *message, 4096),
-		ctx:       ctx,
+		conn:             conn,
+		status:           proxyAlive,
+		readChan:         make(chan *message, 4096),
+		writeChan:        make(chan *message, 4096),
+		lastPingTime:     time.Now(),
+		keepAliveTimeout: 10,
+		ctx:              ctx,
 	}
 	go p.ReadPump()
 	go p.WritePump()
+	go p.KeepAlive()
 	return p, nil
 }
 
@@ -61,13 +66,34 @@ type proxy struct {
 	readChan     chan *message
 	writeChan    chan *message
 	inputBuffers bytes.Buffer
-	closeOnce    sync.Once
-	ctx          context.Context
+
+	lastPingTime     time.Time
+	keepAliveTimeout int64
+	closeOnce        sync.Once
+	ctx              context.Context
 }
 
 type message struct {
 	messageType int
 	data        []byte
+}
+
+func (p *proxy) KeepAlive() {
+	defer p.Close()
+	tick := time.NewTicker(time.Second * time.Duration(1+p.keepAliveTimeout))
+	defer tick.Stop()
+	for {
+		select {
+		case <-tick.C:
+			if time.Now().Sub(p.lastPingTime) > time.Second*time.Duration(p.keepAliveTimeout) {
+				return
+			}
+		}
+	}
+}
+
+func (p *proxy) HandlePing() {
+	p.lastPingTime = time.Now()
 }
 
 func (p *proxy) ReadPump() {
@@ -120,7 +146,7 @@ func (p *proxy) Close() {
 		}
 		p.status = proxyClose
 		close(p.readChan)
-		close(p.writeChan)
+		//close(p.writeChan)
 		if err := p.conn.Close(); err != nil {
 			klog.V(2).Info(err)
 		}
@@ -144,6 +170,9 @@ func (p *proxy) Recv() (*message, error) {
 
 func (p *proxy) Send(messageType int, data []byte) error {
 	klog.Infof("proxy send messageType:%v data:%v", messageType, string(data))
+	if p.status == proxyClose {
+		return fmt.Errorf("err: proxy has been closed")
+	}
 	select {
 	case p.writeChan <- &message{messageType: messageType, data: data}:
 		return nil

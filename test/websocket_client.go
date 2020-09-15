@@ -19,10 +19,12 @@ import (
 
 var (
 	addr string
+	mode string
 )
 
 func init() {
 	flag.StringVar(&addr, "addr", "", "ws addr")
+	flag.StringVar(&mode, "mode", "ssh", "mode")
 }
 
 func main() {
@@ -36,13 +38,26 @@ func main() {
 		klog.Fatal(err)
 	}
 	klog.Info(token)
-	<-time.After(time.Second * 21)
-	klog.Info("sleep 31 seconds")
-	c, err := s.newClient(addr, token)
-	if err != nil {
-		log.Panic(err)
+	var c *Client
+	switch mode {
+	case "ssh":
+		//<-time.After(time.Second * 21)
+		klog.Info("sleep 31 seconds")
+		c, err = s.newClient(addr, "ssh", token)
+		if err != nil {
+			log.Panic(err)
+		}
+		ssh(c)
+	case "log":
+		c, err = s.newClient(addr, "log", token)
+		if err != nil {
+			log.Panic(err)
+		}
 	}
-	s.c = c
+	<-stopCh
+}
+
+func ssh(c *Client) {
 	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "pwd"}
 	c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
@@ -58,11 +73,11 @@ func main() {
 	//c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
 	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "top\n"}
-	<-stopCh
 }
 
 func getToken(addr string) (string, error) {
-	requestUrl := fmt.Sprintf("http://%s/namespace/develop/pod/hso-develop-campaign-0/shell/hso-develop-campaign/bash", addr)
+	//requestUrl := fmt.Sprintf("http://%s/namespace/develop/pod/hso-develop-campaign-0/shell/hso-develop-campaign/bash", addr)
+	requestUrl := fmt.Sprintf("http://%s/namespace/kube-system/pod/traefik-8454d5446b-jdzwl/shell/traefik/bash", addr)
 	res, err := http.Get(requestUrl)
 	if err != nil {
 		klog.V(2).Infof("http err:", err)
@@ -102,11 +117,11 @@ type Client struct {
 	cancel    context.CancelFunc
 }
 
-func (s *Service) newClient(addr, token string) (c *Client, err error) {
+func (s *Service) newClient(addr, mode, token string) (c *Client, err error) {
 	var (
 		ws *websocket.Conn
 	)
-	if ws, err = s.conn(addr, token); err != nil {
+	if ws, err = s.conn(addr, mode, token); err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -129,8 +144,8 @@ func (s *Service) newClient(addr, token string) (c *Client, err error) {
 	return c, nil
 }
 
-func (s *Service) conn(addr, token string) (ws *websocket.Conn, err error) {
-	u := url.URL{Scheme: "ws", Host: addr, Path: fmt.Sprintf("/ssh/%s", token)}
+func (s *Service) conn(addr, mode, token string) (ws *websocket.Conn, err error) {
+	u := url.URL{Scheme: "ws", Host: addr, Path: fmt.Sprintf("/%s/%s", mode, token)}
 	klog.Info("url:", u)
 	a, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
 	if err != nil {

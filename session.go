@@ -24,21 +24,23 @@ type PtyHandler interface {
 	remotecommand.TerminalSizeQueue
 }
 
-// Session implements PtyHandler (using a Xtermjs connection)
+// Session implements PtyHandler (using a websocket connection)
 type Session interface {
 	Read(p []byte) (int, error)
 	Write(p []byte) (int, error)
 	Next() *remotecommand.TerminalSize
 	Id() string
 	Wait()
+	HandleLog(p Proxy)
 	HandleProxy(p Proxy)
 	Option() ExecOptions
-	Context() context.Context
 	Close(reason string)
+	Ctx() context.Context
 }
 
 const (
 	ReasonProcessExited = "process exited"
+	ReasonStreamStopped = "stream stopped"
 	ReasonConnTimeout   = "conn wait timeout"
 	ReasonContextCancel = "ctx cancel"
 )
@@ -103,6 +105,13 @@ func (s *session) Wait() {
 	}
 }
 
+func (s *session) HandleLog(p Proxy) {
+	s.websocketProxy = p
+	if err := LogTransmit(s.k8sClient, s); err != nil {
+		klog.V(2).Info()
+	}
+}
+
 func (s *session) HandleProxy(p Proxy) {
 	select {
 	case s.startChan <- p:
@@ -148,9 +157,10 @@ func (s *session) Read(p []byte) (int, error) {
 }
 
 func (s *session) Write(p []byte) (int, error) {
+	klog.Info("session Write:", string(p))
 	if err := s.websocketProxy.Send(websocket.BinaryMessage, p); err != nil {
 		klog.V(2).Info(err)
-		return 0, err
+		return copy(p, EndOfTransmission), err
 	}
 	return len(p), nil
 }
@@ -168,10 +178,6 @@ func (s *session) Option() ExecOptions {
 	return s.option
 }
 
-func (s *session) Context() context.Context {
-	return s.context
-}
-
 func (s *session) Close(reason string) {
 	s.once.Do(func() {
 		klog.Infof("sessionId:%s close reason:%s", s.Id(), reason)
@@ -179,9 +185,13 @@ func (s *session) Close(reason string) {
 	})
 }
 
+func (s *session) Ctx() context.Context {
+	return s.context
+}
+
 // genTerminalSessionId generates a random session ID string. The format is not really interesting.
-// This ID is used to identify the session when the client opens the SockJS connection.
-// Not the same as the SockJS session id! We can't use that as that is generated
+// This ID is used to identify the session when the client opens the Websocket connection.
+// Not the same as the Websocket session id! We can't use that as that is generated
 // on the client side and we don't have it yet at this point.
 func genTerminalSessionId() (string, error) {
 	bytes := make([]byte, 16)

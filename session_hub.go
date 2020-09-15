@@ -76,7 +76,7 @@ func (sh *sessionHub) Close(sessionId string, reason string) error {
 
 func (sh *sessionHub) Listen(session Session) error {
 	select {
-	case <-session.Context().Done():
+	case <-session.Ctx().Done():
 		if err := sh.Close(session.Id(), ReasonContextCancel); err != nil {
 			return err
 		}
