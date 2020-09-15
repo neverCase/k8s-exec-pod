@@ -31,10 +31,17 @@ type Session interface {
 	Next() *remotecommand.TerminalSize
 	Id() string
 	Wait()
-	Start(p Proxy)
+	HandleProxy(p Proxy)
 	Option() ExecOptions
-	Close()
+	Context() context.Context
+	Close(reason string)
 }
+
+const (
+	ReasonProcessExited = "process exited"
+	ReasonConnTimeout   = "conn wait timeout"
+	ReasonContextCancel = "ctx cancel"
+)
 
 // NewSession returns a new Session Interface
 func NewSession(ctx context.Context, connTimeout int64, k8sClient kubernetes.Interface, cfg *rest.Config, option ExecOptions) (Session, error) {
@@ -86,6 +93,7 @@ func (s *session) Id() string {
 func (s *session) Wait() {
 	select {
 	case <-time.After(time.Second * time.Duration(s.connTimeout)):
+		s.Close(ReasonConnTimeout)
 		return
 	case proxy := <-s.startChan:
 		s.websocketProxy = proxy
@@ -95,7 +103,7 @@ func (s *session) Wait() {
 	}
 }
 
-func (s *session) Start(p Proxy) {
+func (s *session) HandleProxy(p Proxy) {
 	select {
 	case s.startChan <- p:
 		return
@@ -160,8 +168,13 @@ func (s *session) Option() ExecOptions {
 	return s.option
 }
 
-func (s *session) Close() {
+func (s *session) Context() context.Context {
+	return s.context
+}
+
+func (s *session) Close(reason string) {
 	s.once.Do(func() {
+		klog.Infof("sessionId:%s close reason:%s", s.Id(), reason)
 		s.cancel()
 	})
 }

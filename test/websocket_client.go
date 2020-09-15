@@ -55,7 +55,7 @@ func main() {
 	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "\n"}
 	//c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
-	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "top\n"}
+	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "top\n"}
 	<-stopCh
 }
 

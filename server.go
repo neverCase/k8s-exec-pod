@@ -75,7 +75,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 			Command:       []string{c.Param("command")},
 		}
 		var res HttpResponse
-		session, err := h.sessionHub.NewSession(option)
+		session, err := h.sessionHub.New(option)
 		if err != nil {
 			res.Code = CodeError
 			res.Message = fmt.Sprintf("Failed to init session err:%s", err.Error())
@@ -119,10 +119,10 @@ func (s *Server) SSH(c *gin.Context) {
 		klog.V(2).Info(err)
 		return
 	}
-	session, err := s.sessionHub.Session(token)
+	session, err := s.sessionHub.Get(token)
 	if err != nil {
 		klog.V(2).Info(err)
 		return
 	}
-	session.Start(proxy)
+	session.HandleProxy(proxy)
 }
