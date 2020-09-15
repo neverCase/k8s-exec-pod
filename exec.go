@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"io"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
@@ -16,21 +15,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog"
 )
-
-// ExecOptions passed to ExecWithOptions
-type ExecOptions struct {
-	Command       []string
-	Namespace     string
-	PodName       string
-	ContainerName string
-	Stdin         io.Reader
-	CaptureStdout bool
-	CaptureStderr bool
-	// If false, whitespace in std{err,out} will be removed.
-	PreserveWhitespace bool
-}
-
-const EndOfTransmission = "\u0004"
 
 // TerminalSession implements PtyHandler (using a SockJS connection)
 type TerminalSession struct {
@@ -86,7 +70,7 @@ func (t TerminalSession) Read(p []byte) (int, error) {
 		return 0, err
 	}
 
-	var msg XtermMsg
+	var msg TermMsg
 	if err := json.Unmarshal(wsMsg.data, &msg); err != nil {
 		klog.V(2).Info(err)
 		return copy(p, EndOfTransmission), err
@@ -306,4 +290,80 @@ func WaitForTerminal(k8sClient kubernetes.Interface, cfg *rest.Config, option Ex
 		klog.Info(2222222)
 		terminalSessions.Close(sessionId, 1, "Process exited")
 	}
+}
+
+func Terminal(k8sClient kubernetes.Interface, cfg *rest.Config, session Session) {
+	var err error
+	validShells := []string{"bash", "sh", "powershell", "cmd"}
+
+	if isValidShell(validShells, session.Option().Command[0]) {
+		klog.Info(3333333)
+		err = Exec(k8sClient, cfg, session)
+	} else {
+		klog.Info(44444)
+		// No shell given or it was not valid: try some shells until one succeeds or all fail
+		// FIXME: if the first shell fails then the first keyboard event is lost
+		for _, testShell := range validShells {
+			//cmd := []string{testShell}
+			opt := session.Option()
+			opt.Command = []string{testShell}
+			if err = Exec(k8sClient, cfg, session); err == nil {
+				break
+			}
+		}
+	}
+
+	if err != nil {
+		klog.Info(11111111)
+		klog.V(2).Info(err)
+		session.Close()
+		//terminalSessions.Close(sessionId, 2, err.Error())
+		return
+	}
+	klog.Info(2222222)
+	session.Close()
+	//terminalSessions.Close(sessionId, 1, "Process exited")
+}
+func Exec(k8sClient kubernetes.Interface, cfg *rest.Config, session Session) error {
+	klog.Infof("startProcess Namespace:%s PodName:%s ContainerName:%s Command:%v",
+		session.Option().Namespace, session.Option().PodName, session.Option().ContainerName, session.Option().Command)
+	req := k8sClient.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(session.Option().PodName).
+		Namespace(session.Option().Namespace).
+		SubResource("exec")
+
+	klog.Info("cmd:", session.Option().Command)
+	req.VersionedParams(&corev1.PodExecOptions{
+		Container: session.Option().ContainerName,
+		Command:   session.Option().Command,
+		Stdin:     true,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       true,
+	}, scheme.ParameterCodec)
+
+	klog.Info("url:", req.URL())
+
+	exec, err := remotecommand.NewSPDYExecutor(cfg, "POST", req.URL())
+	if err != nil {
+		klog.V(2).Info(err)
+		return err
+	}
+
+	//var stdout, stderr bytes.Buffer
+	err = exec.Stream(remotecommand.StreamOptions{
+		Stdin:             session,
+		Stdout:            session,
+		Stderr:            session,
+		TerminalSizeQueue: session,
+		Tty:               true,
+	})
+	if err != nil {
+		klog.V(2).Info(err)
+		return err
+	}
+
+	//klog.Info(stdout.String(), stderr.String())
+	return nil
 }

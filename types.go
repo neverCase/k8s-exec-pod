@@ -9,7 +9,7 @@ type HttpResponse struct {
 	Token   string `json:"token"`
 }
 
-type XtermMsg struct {
+type TermMsg struct {
 	MsgType string `json:"type"`
 	Input   string `json:"input"`
 	Rows    uint16 `json:"rows"`

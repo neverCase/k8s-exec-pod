@@ -8,9 +8,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog"
 )
 
@@ -21,12 +18,11 @@ const (
 
 //var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
-type Http struct {
+type Server struct {
 	server *http.Server
 	ctx    context.Context
 
-	k8sClient kubernetes.Interface
-	cfg       *rest.Config
+	sessionHub SessionHub
 }
 
 func header() gin.HandlerFunc {
@@ -62,38 +58,35 @@ func header() gin.HandlerFunc {
 	}
 }
 
-func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Http {
-	h := &Http{}
-	h.cfg, h.k8sClient = NewResource(masterUrl, kubeconfig)
+func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server {
+	cfg, k8sClient := NewResource(masterUrl, kubeconfig)
+	h := &Server{
+		sessionHub: NewSessionHub(k8sClient, cfg),
+	}
+
 	router := gin.New()
 	//router.Use(gin.LoggerWithConfig(gin.LoggerConfig{Output: writer}), gin.RecoveryWithWriter(writer))
 	router.Use(header())
 	router.GET("/namespace/:namespace/pod/:pod/shell/:container/:command", func(c *gin.Context) {
-		var res HttpResponse
-		session, err := genTerminalSessionId()
-		if err != nil {
-			res.Code = CodeError
-			res.Message = "Failed to get genTerminalSessionId"
-		} else {
-			res.Code = CodeSuccess
-			res.Token = session
-		}
-		terminalSessions.Set(session, TerminalSession{
-			id:       session,
-			bound:    make(chan error),
-			sizeChan: make(chan remotecommand.TerminalSize),
-		})
 		option := ExecOptions{
 			Namespace:     c.Param("namespace"),
 			PodName:       c.Param("pod"),
 			ContainerName: c.Param("container"),
 			Command:       []string{c.Param("command")},
 		}
+		var res HttpResponse
+		session, err := h.sessionHub.NewSession(option)
+		if err != nil {
+			res.Code = CodeError
+			res.Message = fmt.Sprintf("Failed to init session err:%s", err.Error())
+		} else {
+			res.Code = CodeSuccess
+			res.Token = session.Id()
+		}
 		klog.Infof("Namespace:%s PodName:%s ContainerName:%s Command:%v", option.Namespace, option.PodName, option.ContainerName, option.Command)
-		go WaitForTerminal(h.k8sClient, h.cfg, option, session)
 		c.JSON(http.StatusOK, res)
 	})
-	router.GET("/ssh/:token", SSH)
+	router.GET("/ssh/:token", h.SSH)
 	h.server = &http.Server{
 		Addr:    addr,
 		Handler: router,
@@ -110,15 +103,15 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Http {
 	return h
 }
 
-func (h *Http) ShutDown() {
+func (s *Server) ShutDown() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := h.server.Shutdown(ctx); err != nil {
+	if err := s.server.Shutdown(ctx); err != nil {
 		klog.V(2).Infof("http.Server shutdown err:", err)
 	}
 }
 
-func SSH(c *gin.Context) {
+func (s *Server) SSH(c *gin.Context) {
 	token := c.Param("token")
 	klog.Info("SSH token:", token)
 	proxy, err := NewProxy(context.Background(), c.Writer, c.Request)
@@ -126,5 +119,10 @@ func SSH(c *gin.Context) {
 		klog.V(2).Info(err)
 		return
 	}
-	handleTerminalSession(token, proxy)
+	session, err := s.sessionHub.Session(token)
+	if err != nil {
+		klog.V(2).Info(err)
+		return
+	}
+	session.Start(proxy)
 }
