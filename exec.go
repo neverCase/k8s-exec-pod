@@ -57,17 +57,15 @@ func Exec(k8sClient kubernetes.Interface, cfg *rest.Config, session Session) err
 		Resource("pods").
 		Name(session.Option().PodName).
 		Namespace(session.Option().Namespace).
-		SubResource("exec")
-
-	klog.Info("cmd:", session.Option().Command)
-	req.VersionedParams(&corev1.PodExecOptions{
-		Container: session.Option().ContainerName,
-		Command:   session.Option().Command,
-		Stdin:     true,
-		Stdout:    true,
-		Stderr:    true,
-		TTY:       true,
-	}, scheme.ParameterCodec)
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: session.Option().ContainerName,
+			Command:   session.Option().Command,
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
+		}, scheme.ParameterCodec)
 
 	klog.Info("url:", req.URL())
 

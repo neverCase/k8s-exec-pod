@@ -45,7 +45,7 @@ const (
 
 // NewSession returns a new Session Interface
 func NewSession(ctx context.Context, connTimeout int64, k8sClient kubernetes.Interface, cfg *rest.Config, option ExecOptions) (Session, error) {
-	sessionId, err := GenTerminalSessionId()
+	sessionId, err := genTerminalSessionId()
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (s *session) Close(reason string) {
 // This ID is used to identify the session when the client opens the SockJS connection.
 // Not the same as the SockJS session id! We can't use that as that is generated
 // on the client side and we don't have it yet at this point.
-func GenTerminalSessionId() (string, error) {
+func genTerminalSessionId() (string, error) {
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err

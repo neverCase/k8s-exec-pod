@@ -8,6 +8,9 @@ type ExecOptions struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
+
+	UsePreviousLogs bool
+
 	Stdin         io.Reader
 	CaptureStdout bool
 	CaptureStderr bool
