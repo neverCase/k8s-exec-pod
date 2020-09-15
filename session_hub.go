@@ -40,7 +40,7 @@ type sessionHub struct {
 func (sh *sessionHub) New(option ExecOptions) (s Session, err error) {
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
-	s, err = NewSession(context.Background(), 30, sh.k8sClient, sh.cfg, option)
+	s, err = NewSession(context.Background(), 10, sh.k8sClient, sh.cfg, option)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (sh *sessionHub) Get(sessionId string) (Session, error) {
 
 func (sh *sessionHub) Close(sessionId string, reason string) error {
 	sh.mu.Lock()
-	defer sh.mu.Lock()
+	defer sh.mu.Unlock()
 	if t, ok := sh.items[sessionId]; ok {
 		t.Close(reason)
 		delete(sh.items, sessionId)

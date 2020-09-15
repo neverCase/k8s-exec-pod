@@ -35,7 +35,9 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
-	//klog.Fatal(token)
+	klog.Info(token)
+	<-time.After(time.Second * 21)
+	klog.Info("sleep 31 seconds")
 	c, err := s.newClient(addr, token)
 	if err != nil {
 		log.Panic(err)

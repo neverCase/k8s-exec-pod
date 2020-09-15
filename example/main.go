@@ -10,15 +10,15 @@ import (
 )
 
 var (
-	masterUrl   string
-	kubeconfig  string
-	httpservice string
+	masterUrl    string
+	kubeconfig   string
+	proxyservice string
 )
 
 func init() {
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterUrl, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&httpservice, "httpservice", "0.0.0.0:9090", "The address of the http server.")
+	flag.StringVar(&proxyservice, "proxyservice", "0.0.0.0:9090", "The address of the http server.")
 }
 
 func main() {
@@ -26,6 +26,6 @@ func main() {
 	flag.Parse()
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
-	_ = exec.InitServer(ctx.Background(), httpservice, kubeconfig, masterUrl)
+	_ = exec.InitServer(ctx.Background(), proxyservice, kubeconfig, masterUrl)
 	<-stopCh
 }
