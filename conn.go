@@ -86,6 +86,7 @@ func (p *proxy) KeepAlive() {
 		select {
 		case <-tick.C:
 			if time.Now().Sub(p.lastPingTime) > time.Second*time.Duration(p.keepAliveTimeout) {
+				klog.Info("Proxy KeepAlive timeout")
 				return
 			}
 		}

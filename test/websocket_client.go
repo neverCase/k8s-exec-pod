@@ -47,12 +47,14 @@ func main() {
 		if err != nil {
 			log.Panic(err)
 		}
+		go ping(c)
 		ssh(c)
 	case "log":
 		c, err = s.newClient(addr, "log", token)
 		if err != nil {
 			log.Panic(err)
 		}
+		go ping(c)
 	}
 	<-stopCh
 }
@@ -75,9 +77,16 @@ func ssh(c *Client) {
 	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "top\n"}
 }
 
+func ping(c *Client) {
+	for {
+		c.writeChan <- exec.TermMsg{MsgType: "ping"}
+		time.Sleep(time.Second * 5)
+	}
+}
+
 func getToken(addr string) (string, error) {
-	//requestUrl := fmt.Sprintf("http://%s/namespace/develop/pod/hso-develop-campaign-0/shell/hso-develop-campaign/bash", addr)
-	requestUrl := fmt.Sprintf("http://%s/namespace/kube-system/pod/traefik-8454d5446b-jdzwl/shell/traefik/bash", addr)
+	requestUrl := fmt.Sprintf("http://%s/namespace/develop/pod/hso-develop-campaign-0/shell/hso-develop-campaign/bash", addr)
+	//requestUrl := fmt.Sprintf("http://%s/namespace/kube-system/pod/traefik-8454d5446b-jdzwl/shell/traefik/bash", addr)
 	res, err := http.Get(requestUrl)
 	if err != nil {
 		klog.V(2).Infof("http err:", err)

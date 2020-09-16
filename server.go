@@ -125,7 +125,7 @@ func (s *Server) SSH(c *gin.Context) {
 		klog.V(2).Info(err)
 		return
 	}
-	session.HandleProxy(proxy)
+	session.HandleSSH(proxy)
 }
 
 func (s *Server) Log(c *gin.Context) {

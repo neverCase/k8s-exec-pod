@@ -32,7 +32,7 @@ type Session interface {
 	Id() string
 	Wait()
 	HandleLog(p Proxy)
-	HandleProxy(p Proxy)
+	HandleSSH(p Proxy)
 	Option() ExecOptions
 	Close(reason string)
 	Ctx() context.Context
@@ -56,7 +56,7 @@ func NewSession(ctx context.Context, connTimeout int64, k8sClient kubernetes.Int
 		sessionId:   sessionId,
 		connTimeout: connTimeout,
 		option:      option,
-		startChan:   make(chan Proxy, 1),
+		startChan:   make(chan proxyChan, 1),
 		sizeChan:    make(chan remotecommand.TerminalSize),
 		k8sClient:   k8sClient,
 		cfg:         cfg,
@@ -65,6 +65,18 @@ func NewSession(ctx context.Context, connTimeout int64, k8sClient kubernetes.Int
 	}
 	go s.Wait()
 	return s, nil
+}
+
+type handleType string
+
+const (
+	handleSSH handleType = "ssh"
+	handleLog handleType = "log"
+)
+
+type proxyChan struct {
+	t handleType
+	p Proxy
 }
 
 type session struct {
@@ -77,7 +89,7 @@ type session struct {
 
 	sizeChan chan remotecommand.TerminalSize
 
-	startChan      chan Proxy
+	startChan      chan proxyChan
 	websocketProxy Proxy
 
 	k8sClient kubernetes.Interface
@@ -97,24 +109,42 @@ func (s *session) Wait() {
 	case <-time.After(time.Second * time.Duration(s.connTimeout)):
 		s.Close(ReasonConnTimeout)
 		return
-	case proxy := <-s.startChan:
-		s.websocketProxy = proxy
-		Terminal(s.k8sClient, s.cfg, s)
+	case proxyChan := <-s.startChan:
+		s.websocketProxy = proxyChan.p
+		switch proxyChan.t {
+		case handleSSH:
+			Terminal(s.k8sClient, s.cfg, s)
+		case handleLog:
+			go func() {
+				for {
+					var buf []byte
+					if _, err := s.Read(buf); err != nil {
+						klog.V(2).Info(err)
+						return
+					}
+				}
+			}()
+			if err := LogTransmit(s.k8sClient, s); err != nil {
+				klog.V(2).Info(err)
+			}
+		}
 	case <-s.context.Done():
 		return
 	}
 }
 
 func (s *session) HandleLog(p Proxy) {
-	s.websocketProxy = p
-	if err := LogTransmit(s.k8sClient, s); err != nil {
-		klog.V(2).Info()
+	select {
+	case s.startChan <- proxyChan{t: handleLog, p: p}:
+		return
+	case <-time.After(time.Second * 1):
+		return
 	}
 }
 
-func (s *session) HandleProxy(p Proxy) {
+func (s *session) HandleSSH(p Proxy) {
 	select {
-	case s.startChan <- p:
+	case s.startChan <- proxyChan{t: handleLog, p: p}:
 		return
 	case <-time.After(time.Second * 1):
 		return
@@ -123,6 +153,8 @@ func (s *session) HandleProxy(p Proxy) {
 
 const EndOfTransmission = "\u0004"
 
+// Read handles pty->process messages (stdin, resize)
+// Called in a loop from remotecommand as long as the process is running
 func (s *session) Read(p []byte) (int, error) {
 	klog.Info("TerminalSession Read p:", string(p))
 	if n, err := s.websocketProxy.LoadBuffers(p); err != nil {
@@ -146,16 +178,22 @@ func (s *session) Read(p []byte) (int, error) {
 	}
 
 	switch msg.MsgType {
-	case XtermMsgTypeResize:
+	case TermResize:
 		s.sizeChan <- remotecommand.TerminalSize{Width: msg.Cols, Height: msg.Rows}
 		return 0, nil
-	case XtermMsgTypeInput:
+	case TermInput:
 		return s.websocketProxy.HandleInput(p, []byte(msg.Input))
+	case TermPing:
+		s.websocketProxy.HandlePing()
+		return 0, nil
 	default:
 		return copy(p, EndOfTransmission), fmt.Errorf("unknown message type '%s'", msg.MsgType)
 	}
 }
 
+// Write handles process->pty stdout
+// Called from remotecommand whenever there is any output
+// If the TermMsg.MsgType was TermPing, then it would handle Proxy.HandlePing
 func (s *session) Write(p []byte) (int, error) {
 	klog.Info("session Write:", string(p))
 	if err := s.websocketProxy.Send(websocket.BinaryMessage, p); err != nil {
@@ -165,6 +203,8 @@ func (s *session) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// Next handles pty->process resize events
+// Called in a loop from remotecommand as long as the process is running
 func (s *session) Next() *remotecommand.TerminalSize {
 	select {
 	case size := <-s.sizeChan:
@@ -179,8 +219,9 @@ func (s *session) Option() ExecOptions {
 }
 
 func (s *session) Close(reason string) {
+	klog.Infof("sessionId:%s close reason:%s", s.Id(), reason)
 	s.once.Do(func() {
-		klog.Infof("sessionId:%s close reason:%s", s.Id(), reason)
+		klog.Infof("sessionId:%s close 222 reason:%s", s.Id(), reason)
 		s.cancel()
 	})
 }

@@ -12,14 +12,19 @@ type HttpResponse struct {
 }
 
 type TermMsg struct {
-	MsgType string `json:"type"`
-	Input   string `json:"input"`
-	Rows    uint16 `json:"rows"`
-	Cols    uint16 `json:"cols"`
+	MsgType TermMessageType `json:"type"`
+	Input   string          `json:"input"`
+	Rows    uint16          `json:"rows"`
+	Cols    uint16          `json:"cols"`
 }
 
-const XtermMsgTypeResize = "resize"
-const XtermMsgTypeInput = "input"
+type TermMessageType string
+
+const (
+	TermResize TermMessageType = "resize"
+	TermInput  TermMessageType = "input"
+	TermPing   TermMessageType = "ping"
+)
 
 // TerminalSession implements PtyHandler (using a SockJS connection)
 type TerminalSession struct {
