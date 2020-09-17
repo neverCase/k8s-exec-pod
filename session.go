@@ -144,7 +144,7 @@ func (s *session) HandleLog(p Proxy) {
 
 func (s *session) HandleSSH(p Proxy) {
 	select {
-	case s.startChan <- proxyChan{t: handleLog, p: p}:
+	case s.startChan <- proxyChan{t: handleSSH, p: p}:
 		return
 	case <-time.After(time.Second * 1):
 		return
