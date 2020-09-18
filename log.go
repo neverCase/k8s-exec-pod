@@ -30,15 +30,19 @@ func LogTransmit(k8sClient kubernetes.Interface, session Session) error {
 		session.Close(err.Error())
 		return err
 	}
+	session.ReadCloser(readCloser)
 	defer func() {
+		klog.Info("LogTransmit readCloser close")
 		if err := readCloser.Close(); err != nil {
 			klog.V(2).Info(err)
 		}
 	}()
+	klog.Info("LogTransmit io.Copy start session:", session.Id())
 	if _, err = io.Copy(session, readCloser); err != nil {
 		session.Close(err.Error())
 		return err
 	}
+	klog.Infof("LogTransmit trigger session.Close session:%s reason:%s", session.Id(), ReasonStreamStopped)
 	session.Close(ReasonStreamStopped)
 	return nil
 }

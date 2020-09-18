@@ -36,6 +36,7 @@ type Session interface {
 	Option() ExecOptions
 	Close(reason string)
 	Ctx() context.Context
+	ReadCloser(rc io.ReadCloser)
 }
 
 const (
@@ -89,6 +90,8 @@ type session struct {
 
 	sizeChan chan remotecommand.TerminalSize
 
+	readCloser io.ReadCloser
+
 	startChan      chan proxyChan
 	websocketProxy Proxy
 
@@ -120,6 +123,9 @@ func (s *session) Wait() {
 					var buf []byte
 					if _, err := s.Read(buf); err != nil {
 						klog.V(2).Info(err)
+						if err = s.readCloser.Close(); err != nil {
+							klog.V(2).Info(err)
+						}
 						return
 					}
 				}
@@ -228,6 +234,10 @@ func (s *session) Close(reason string) {
 
 func (s *session) Ctx() context.Context {
 	return s.context
+}
+
+func (s *session) ReadCloser(rc io.ReadCloser) {
+	s.readCloser = rc
 }
 
 // genTerminalSessionId generates a random session ID string. The format is not really interesting.
