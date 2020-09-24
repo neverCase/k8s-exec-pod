@@ -204,7 +204,7 @@ func (s *session) Write(p []byte) (int, error) {
 	klog.Info("session Write:", string(p))
 	if err := s.websocketProxy.Send(websocket.BinaryMessage, p); err != nil {
 		klog.V(2).Info(err)
-		return copy(p, EndOfTransmission), err
+		return 0, err
 	}
 	return len(p), nil
 }

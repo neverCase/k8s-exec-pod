@@ -1,6 +1,12 @@
 # k8s-exec-pod
 This is a simple and easy way for you to execute commands inside a k8s pod or watch logs  through the websocket proxy.
 
+## Notice
+- A terminal is not just an input field. 
+- It's a complex system that provides advanced formatting and interactivity with the user, over a plain character stream.
+- Here is a classic case: if you transmit the command `clear` to the ssh pty, then the response you received would be "clear: command not found"
+- So we should listen and compare `each character` instead of inputting a full command with the `\n` (e.g. `"pwd\n"`)
+
 ## build server
 ```sh
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o exec-bin example/main.go

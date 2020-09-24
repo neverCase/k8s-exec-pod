@@ -61,16 +61,24 @@ func main() {
 
 func ssh(c *Client) {
 	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "pwd"}
-	c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 100, Cols: 100}
+	c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 110, Cols: 54}
 	time.Sleep(time.Second * 2)
-	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "pwd\n"}
-	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "pw"}
-	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "w"}
-	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "d"}
-	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "\n"}
+	// clear: command not found
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "clear\n"}
+	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "pwd"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "p"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "w"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "d"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "\n"}
 	//c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
-	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "ls -al\n"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "l"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "s"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: " "}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "-"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "a"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "l"}
+	c.writeChan <- exec.TermMsg{MsgType: "input", Input: "\n"}
 	//c.writeChan <- exec.TermMsg{MsgType: "input", Input: "\n"}
 	//c.writeChan <- exec.TermMsg{MsgType: "resize", Rows: 100, Cols: 100}
 	time.Sleep(time.Second * 2)
