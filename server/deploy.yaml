@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8s-exec-pod
+  namespace: kube-api
+  labels:
+    app: k8s-exec-pod
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: k8s-exec-pod
+  template:
+    metadata:
+      labels:
+        app: k8s-exec-pod
+    spec:
+      serviceAccountName: k8s-api-controller
+      containers:
+        - name: k8s-exec-pod
+          image: harbor.domain/lunara-common//k8s-exec-pod:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9090
+          command: ["/data/k8s-exec-pod"]
+          args:
+            - -alsologtostderr=true
+            - -proxyservice=0.0.0.0:9090
+            - -v
+            - "4"
+      imagePullSecrets:
+        - name: harbor-secret
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-exec-pod
+  namespace: kube-api
+  labels:
+    app: k8s-exec-pod
+spec:
+  selector:
+    app: k8s-exec-pod
+  type: NodePort
+  ports:
+    - protocol: TCP
+      port: 9091
+      targetPort: 9090
+      nodePort: 9090
