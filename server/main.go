@@ -1,9 +1,8 @@
 package main
 
 import (
-	ctx "context"
+	"context"
 	"flag"
-
 	"github.com/nevercase/k8s-controller-custom-resource/pkg/signals"
 	exec "github.com/nevercase/k8s-exec-pod"
 	"k8s.io/klog"
@@ -26,6 +25,6 @@ func main() {
 	flag.Parse()
 	// set up signals so we handle the first shutdown signal gracefully
 	stopCh := signals.SetupSignalHandler()
-	_ = exec.InitServer(ctx.Background(), proxyservice, kubeconfig, masterUrl)
+	_ = exec.InitServer(context.Background(), proxyservice, kubeconfig, masterUrl)
 	<-stopCh
 }
