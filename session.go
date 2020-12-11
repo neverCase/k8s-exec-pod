@@ -127,9 +127,16 @@ func (s *session) Wait() {
 							klog.V(2).Info("readCloser was not set")
 							return
 						}
-						if err = s.readCloser.Close(); err != nil {
-							klog.V(2).Info(err)
-						}
+						go func() {
+							defer func() {
+								if r := recover(); r != nil {
+									klog.V(2).Info("s.readCloser.Close Recovered in: ", r)
+								}
+							}()
+							if err = s.readCloser.Close(); err != nil {
+								klog.V(2).Info(err)
+							}
+						}()
 						return
 					}
 				}
