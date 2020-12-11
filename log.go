@@ -19,7 +19,7 @@ func openStream(k8sClient kubernetes.Interface, option ExecOptions) (io.ReadClos
 			Container:  option.ContainerName,
 			Follow:     true,
 			Previous:   option.UsePreviousLogs,
-			Timestamps: true,
+			Timestamps: false,
 		}, scheme.ParameterCodec).Stream()
 }
 
