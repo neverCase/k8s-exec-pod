@@ -124,7 +124,7 @@ func (s *session) Wait() {
 					if _, err := s.Read(buf); err != nil {
 						klog.V(2).Info(err)
 						if s.readCloser != nil {
-							klog.Fatal("readCloser was not set")
+							klog.V(2).Info("readCloser was not set")
 							return
 						}
 						if err = s.readCloser.Close(); err != nil {
