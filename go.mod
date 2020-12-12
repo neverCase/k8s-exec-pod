@@ -3,6 +3,7 @@ module github.com/nevercase/k8s-exec-pod
 go 1.14
 
 require (
+	github.com/gin-contrib/cors v1.3.1
 	github.com/gin-gonic/gin v1.6.3
 	github.com/gorilla/websocket v1.4.2
 	github.com/nevercase/k8s-controller-custom-resource v0.0.0-20200909074945-200361074b93
