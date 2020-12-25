@@ -38,6 +38,7 @@ func NewProxy(ctx context.Context, w http.ResponseWriter, r *http.Request) (Prox
 		klog.V(2).Info(err)
 		return nil, err
 	}
+	subCtx, cancel := context.WithCancel(ctx)
 	p := &proxy{
 		conn:             conn,
 		status:           proxyAlive,
@@ -45,7 +46,8 @@ func NewProxy(ctx context.Context, w http.ResponseWriter, r *http.Request) (Prox
 		writeChan:        make(chan *message, 4096),
 		lastPingTime:     time.Now(),
 		keepAliveTimeout: 10,
-		ctx:              ctx,
+		ctx:              subCtx,
+		cancel:           cancel,
 	}
 	go p.ReadPump()
 	go p.WritePump()
@@ -71,6 +73,7 @@ type proxy struct {
 	keepAliveTimeout int64
 	closeOnce        sync.Once
 	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 type message struct {
@@ -145,8 +148,9 @@ func (p *proxy) Close() {
 		if p.status == proxyClose {
 			return
 		}
+		p.cancel()
 		p.status = proxyClose
-		close(p.readChan)
+		//close(p.readChan)
 		//close(p.writeChan)
 		if err := p.conn.Close(); err != nil {
 			klog.V(2).Info(err)
