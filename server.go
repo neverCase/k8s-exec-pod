@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"net/http"
 	"time"
 )

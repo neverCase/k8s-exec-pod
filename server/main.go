@@ -5,7 +5,7 @@ import (
 	"flag"
 	"github.com/nevercase/k8s-controller-custom-resource/pkg/signals"
 	exec "github.com/nevercase/k8s-exec-pod"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var (

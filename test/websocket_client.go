@@ -8,7 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/nevercase/k8s-controller-custom-resource/pkg/signals"
 	"io/ioutil"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"log"
 	"net/http"
 	"net/url"
