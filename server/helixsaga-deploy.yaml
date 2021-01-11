@@ -1,0 +1,53 @@
+apiVersion: nevercase.io/v1
+kind: HelixSaga
+metadata:
+  name: hso-exec
+  namespace: kube-api
+spec:
+  applications:
+    - spec:
+        affinity: {}
+        args:
+          - -alsologtostderr=true
+          - -proxyservice=0.0.0.0:9090
+          - -v=4
+        command:
+          - /k8s-api/k8s-exec-pod
+        containerPorts:
+          - containerPort: 9090
+            protocol: TCP
+        env:
+          - name: GET_HOSTS_FROM
+            value: dns
+        image: Lunara-Harbor-Domain/lunara-common/k8s-exec-pod:latest
+        imagePullSecrets:
+          - name: harbor-secret
+        name: hso-exec-pod
+        replicas: 1
+        resources:
+          limits:
+            cpu: "0"
+            memory: "0"
+          requests:
+            cpu: "0"
+            memory: "0"
+        serviceAccountName: k8s-api-controller
+        servicePorts:
+          - nodePort: 36383
+            port: 9090
+            protocol: TCP
+            targetPort: 9090
+        serviceType: NodePort
+        volumePath: /mnt/nas1
+        watchPolicy: auto
+  configMap:
+    volume:
+      configMap:
+        items:
+          - key: conf.yaml
+            path: conf.yaml
+        name: api-empty
+      name: conf-volume
+    volumeMount:
+      mountPath: /var/conf
+      name: conf-volume
