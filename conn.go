@@ -104,8 +104,8 @@ func (p *proxy) ReadPump() {
 	defer p.Close()
 	for {
 		messageType, data, err := p.conn.ReadMessage()
-		klog.Info("data:", data)
-		klog.Infof("messageType: %d message: %v err: %s\n", messageType, data, err)
+		//klog.Info("data:", data)
+		//klog.Infof("messageType: %d message: %v err: %s\n", messageType, data, err)
 		if err != nil {
 			klog.V(2).Info(err)
 			return
@@ -131,7 +131,7 @@ func (p *proxy) WritePump() {
 			if !isClose {
 				return
 			}
-			klog.Info("proxy WritePump msg-data:", string(msg.data))
+			//klog.Info("proxy WritePump msg-data:", string(msg.data))
 			if err := p.conn.WriteMessage(msg.messageType, msg.data); err != nil {
 				klog.V(2).Info(err)
 				return
@@ -165,8 +165,8 @@ func (p *proxy) Recv() (*message, error) {
 		if !isClose {
 			return nil, fmt.Errorf("readChan closed")
 		}
-		klog.Info("proxy recv-msg:", msg)
-		klog.Info("proxy recv-data-string:", string(msg.data))
+		//klog.Info("proxy recv-msg:", msg)
+		//klog.Info("proxy recv-data-string:", string(msg.data))
 		return msg, nil
 	case <-p.ctx.Done():
 		return nil, fmt.Errorf("proxy ctx cancel")
@@ -174,7 +174,7 @@ func (p *proxy) Recv() (*message, error) {
 }
 
 func (p *proxy) Send(messageType int, data []byte) error {
-	klog.Infof("proxy send messageType:%v data:%v", messageType, string(data))
+	//klog.Infof("proxy send messageType:%v data:%v", messageType, string(data))
 	if p.status == proxyClose {
 		return fmt.Errorf("err: proxy has been closed")
 	}
