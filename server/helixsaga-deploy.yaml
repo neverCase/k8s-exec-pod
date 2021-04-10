@@ -19,6 +19,8 @@ spec:
         env:
           - name: GET_HOSTS_FROM
             value: dns
+          - name: ENV_ZAP_ENCODING
+            value: json
         image: Lunara-Harbor-Domain/lunara-common/k8s-exec-pod:latest
         imagePullSecrets:
           - name: harbor-secret

@@ -18,6 +18,11 @@ spec:
       serviceAccountName: k8s-api-controller
       containers:
         - name: k8s-exec-pod
+          env:
+            - name: GET_HOSTS_FROM
+              value: dns
+            - name: ENV_ZAP_ENCODING
+              value: json
           image: harbor.domain/lunara-common//k8s-exec-pod:latest
           imagePullPolicy: Always
           ports:
