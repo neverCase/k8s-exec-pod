@@ -2,12 +2,12 @@ package k8s_exec_pod
 
 import (
 	"context"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
 	"github.com/nevercase/k8s-controller-custom-resource/pkg/env"
 	"io"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	"time"
 )
 
@@ -31,23 +31,23 @@ func openStream(k8sClient kubernetes.Interface, option ExecOptions) (io.ReadClos
 func LogTransmit(k8sClient kubernetes.Interface, session Session) error {
 	readCloser, err := openStream(k8sClient, session.Option())
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		session.Close(err.Error())
 		return err
 	}
 	session.ReadCloser(readCloser)
 	defer func() {
-		klog.Info("LogTransmit readCloser close")
+		zaplogger.Sugar().Info("LogTransmit readCloser close")
 		if err := readCloser.Close(); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 		}
 	}()
-	klog.Info("LogTransmit io.Copy start session:", session.Id())
+	zaplogger.Sugar().Info("LogTransmit io.Copy start session:", session.Id())
 	if _, err = io.Copy(session, readCloser); err != nil {
 		session.Close(err.Error())
 		return err
 	}
-	klog.Infof("LogTransmit trigger session.Close session:%s reason:%s", session.Id(), ReasonStreamStopped)
+	zaplogger.Sugar().Infof("LogTransmit trigger session.Close session:%s reason:%s", session.Id(), ReasonStreamStopped)
 	session.Close(ReasonStreamStopped)
 	return nil
 }
