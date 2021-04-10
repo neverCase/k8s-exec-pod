@@ -3,9 +3,9 @@ package k8s_exec_pod
 import (
 	"context"
 	"fmt"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"k8s.io/klog/v2"
 	"net/http"
 	"time"
 )
@@ -49,7 +49,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 			res.Code = CodeSuccess
 			res.Token = session.Id()
 		}
-		klog.Infof("Namespace:%s PodName:%s ContainerName:%s Command:%v", option.Namespace, option.PodName, option.ContainerName, option.Command)
+		zaplogger.Sugar().Infof("Namespace:%s PodName:%s ContainerName:%s Command:%v", option.Namespace, option.PodName, option.ContainerName, option.Command)
 		c.JSON(http.StatusOK, res)
 	})
 	router.GET("/ssh/:token", h.SSH)
@@ -61,9 +61,9 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 	go func() {
 		if err := h.server.ListenAndServe(); err != nil {
 			if err == http.ErrServerClosed {
-				klog.Info("Server closed under request")
+				zaplogger.Sugar().Info("Server closed under request")
 			} else {
-				klog.V(2).Info("Server closed unexpected err:", err)
+				zaplogger.Sugar().Info("Server closed unexpected err:", err)
 			}
 		}
 	}()
@@ -74,21 +74,21 @@ func (s *Server) ShutDown() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := s.server.Shutdown(ctx); err != nil {
-		klog.V(2).Infof("http.Server shutdown err:", err)
+		zaplogger.Sugar().Errorf("http.Server shutdown err:%v", err)
 	}
 }
 
 func (s *Server) SSH(c *gin.Context) {
 	token := c.Param("token")
-	klog.Info("SSH token:", token)
+	zaplogger.Sugar().Info("SSH token:", token)
 	proxy, err := NewProxy(context.Background(), c.Writer, c.Request)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return
 	}
 	session, err := s.sessionHub.Get(token)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return
 	}
 	session.HandleSSH(proxy)
@@ -96,15 +96,15 @@ func (s *Server) SSH(c *gin.Context) {
 
 func (s *Server) Log(c *gin.Context) {
 	token := c.Param("token")
-	klog.Info("Log token:", token)
+	zaplogger.Sugar().Info("Log token:", token)
 	proxy, err := NewProxy(context.Background(), c.Writer, c.Request)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return
 	}
 	session, err := s.sessionHub.Get(token)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return
 	}
 	go session.HandleLog(proxy)

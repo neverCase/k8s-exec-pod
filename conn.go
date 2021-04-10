@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
+	"github.com/gorilla/websocket"
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
-	"k8s.io/klog/v2"
 )
 
 var upGrader = websocket.Upgrader{
@@ -35,7 +34,7 @@ type Proxy interface {
 func NewProxy(ctx context.Context, w http.ResponseWriter, r *http.Request) (Proxy, error) {
 	conn, err := upGrader.Upgrade(w, r, nil)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return nil, err
 	}
 	subCtx, cancel := context.WithCancel(ctx)
@@ -89,7 +88,7 @@ func (p *proxy) KeepAlive() {
 		select {
 		case <-tick.C:
 			if time.Now().Sub(p.lastPingTime) > time.Second*time.Duration(p.keepAliveTimeout) {
-				klog.Info("Proxy KeepAlive timeout")
+				zaplogger.Sugar().Info("Proxy KeepAlive timeout")
 				return
 			}
 		}
@@ -104,20 +103,20 @@ func (p *proxy) ReadPump() {
 	defer p.Close()
 	for {
 		messageType, data, err := p.conn.ReadMessage()
-		//klog.Info("data:", data)
-		//klog.Infof("messageType: %d message: %v err: %s\n", messageType, data, err)
+		//zaplogger.Sugar().Info("data:", data)
+		//zaplogger.Sugar().Infof("messageType: %d message: %v err: %s\n", messageType, data, err)
 		if err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return
 		}
 		msg := &message{messageType: messageType, data: data}
 		select {
 		case p.readChan <- msg:
 		case <-p.ctx.Done():
-			klog.Info("ReadPump: proxy ctx cancel")
+			zaplogger.Sugar().Info("ReadPump: proxy ctx cancel")
 			return
 		case <-time.After(time.Second * 5):
-			klog.Info("ReadPump: write into readChan timeout 5s")
+			zaplogger.Sugar().Info("ReadPump: write into readChan timeout 5s")
 			return
 		}
 	}
@@ -131,9 +130,9 @@ func (p *proxy) WritePump() {
 			if !isClose {
 				return
 			}
-			//klog.Info("proxy WritePump msg-data:", string(msg.data))
+			//zaplogger.Sugar().Info("proxy WritePump msg-data:", string(msg.data))
 			if err := p.conn.WriteMessage(msg.messageType, msg.data); err != nil {
-				klog.V(2).Info(err)
+				zaplogger.Sugar().Error(err)
 				return
 			}
 		case <-p.ctx.Done():
@@ -143,7 +142,7 @@ func (p *proxy) WritePump() {
 }
 
 func (p *proxy) Close() {
-	klog.Info("proxy close")
+	zaplogger.Sugar().Info("proxy close")
 	p.closeOnce.Do(func() {
 		if p.status == proxyClose {
 			return
@@ -153,20 +152,20 @@ func (p *proxy) Close() {
 		//close(p.readChan)
 		//close(p.writeChan)
 		if err := p.conn.Close(); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 		}
 	})
 }
 
 func (p *proxy) Recv() (*message, error) {
-	klog.Info("proxy Recv message")
+	zaplogger.Sugar().Info("proxy Recv message")
 	select {
 	case msg, isClose := <-p.readChan:
 		if !isClose {
 			return nil, fmt.Errorf("readChan closed")
 		}
-		//klog.Info("proxy recv-msg:", msg)
-		//klog.Info("proxy recv-data-string:", string(msg.data))
+		//zaplogger.Sugar().Info("proxy recv-msg:", msg)
+		//zaplogger.Sugar().Info("proxy recv-data-string:", string(msg.data))
 		return msg, nil
 	case <-p.ctx.Done():
 		return nil, fmt.Errorf("proxy ctx cancel")
@@ -174,7 +173,7 @@ func (p *proxy) Recv() (*message, error) {
 }
 
 func (p *proxy) Send(messageType int, data []byte) error {
-	//klog.Infof("proxy send messageType:%v data:%v", messageType, string(data))
+	//zaplogger.Sugar().Infof("proxy send messageType:%v data:%v", messageType, string(data))
 	if p.status == proxyClose {
 		return fmt.Errorf("err: proxy has been closed")
 	}

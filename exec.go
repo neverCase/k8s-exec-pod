@@ -1,17 +1,17 @@
 package k8s_exec_pod
 
 import (
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/klog/v2"
 )
 
 // isValidShell checks if the shell is an allowed one
 func isValidShell(validShells []string, shell string) bool {
-	klog.Info("isValidShell:", shell)
+	zaplogger.Sugar().Infow("isValidShell", "shell", shell)
 	for _, validShell := range validShells {
 		if validShell == shell {
 			return true
@@ -35,13 +35,13 @@ func Terminal(k8sClient kubernetes.Interface, cfg *rest.Config, session Session)
 			opt := session.Option()
 			opt.Command = []string{testShell}
 			if err = Exec(k8sClient, cfg, session); err == nil {
-				klog.V(2).Info(err)
+				zaplogger.Sugar().Error(err)
 				break
 			}
 		}
 	}
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		session.Close(err.Error())
 		return
 	}
@@ -51,7 +51,7 @@ func Terminal(k8sClient kubernetes.Interface, cfg *rest.Config, session Session)
 // Exec is called by Terminal
 // Executed cmd in the container specified in request and connects it up with the ptyHandler (a Session)
 func Exec(k8sClient kubernetes.Interface, cfg *rest.Config, session Session) error {
-	klog.Infof("startProcess Namespace:%s PodName:%s ContainerName:%s Command:%v",
+	zaplogger.Sugar().Infof("startProcess Namespace:%s PodName:%s ContainerName:%s Command:%v",
 		session.Option().Namespace, session.Option().PodName, session.Option().ContainerName, session.Option().Command)
 	req := k8sClient.CoreV1().RESTClient().Post().
 		Resource("pods").
@@ -67,11 +67,11 @@ func Exec(k8sClient kubernetes.Interface, cfg *rest.Config, session Session) err
 			TTY:       true,
 		}, scheme.ParameterCodec)
 
-	klog.Info("url:", req.URL())
+	zaplogger.Sugar().Infow("Exec", "url", req.URL())
 
 	exec, err := remotecommand.NewSPDYExecutor(cfg, "POST", req.URL())
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return err
 	}
 
@@ -84,10 +84,9 @@ func Exec(k8sClient kubernetes.Interface, cfg *rest.Config, session Session) err
 		Tty:               true,
 	})
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return err
 	}
 
-	//klog.Info(stdout.String(), stderr.String())
 	return nil
 }

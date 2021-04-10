@@ -6,15 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
 	"github.com/gorilla/websocket"
 	"io"
-	"sync"
-	"time"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"k8s.io/klog/v2"
+	"sync"
+	"time"
 )
 
 // PtyHandler is what remotecommand expects from a pty
@@ -122,19 +121,19 @@ func (s *session) Wait() {
 				for {
 					var buf []byte
 					if _, err := s.Read(buf); err != nil {
-						klog.V(2).Info(err)
+						zaplogger.Sugar().Error(err)
 						if s.readCloser != nil {
-							klog.V(2).Info("readCloser was not set")
+							zaplogger.Sugar().Info("readCloser was not set")
 							return
 						}
 						go func() {
 							defer func() {
 								if r := recover(); r != nil {
-									klog.V(2).Info("s.readCloser.Close Recovered in: ", r)
+									zaplogger.Sugar().Info("s.readCloser.Close Recovered in: ", r)
 								}
 							}()
 							if err = s.readCloser.Close(); err != nil {
-								klog.V(2).Info(err)
+								zaplogger.Sugar().Error(err)
 							}
 						}()
 						return
@@ -142,7 +141,7 @@ func (s *session) Wait() {
 				}
 			}()
 			if err := LogTransmit(s.k8sClient, s); err != nil {
-				klog.V(2).Info(err)
+				zaplogger.Sugar().Error(err)
 			}
 		}
 	case <-s.context.Done():
@@ -173,7 +172,7 @@ const EndOfTransmission = "\u0004"
 // Read handles pty->process messages (stdin, resize)
 // Called in a loop from remotecommand as long as the process is running
 func (s *session) Read(p []byte) (int, error) {
-	klog.Info("TerminalSession Read p:", string(p))
+	zaplogger.Sugar().Infow("TerminalSession", "Read", string(p))
 	if n, err := s.websocketProxy.LoadBuffers(p); err != nil {
 		return 0, err
 	} else {
@@ -184,13 +183,13 @@ func (s *session) Read(p []byte) (int, error) {
 	var wsMsg *message
 	var err error
 	if wsMsg, err = s.websocketProxy.Recv(); err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return 0, err
 	}
 
 	var msg TermMsg
 	if err := json.Unmarshal(wsMsg.data, &msg); err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return copy(p, EndOfTransmission), err
 	}
 
@@ -212,9 +211,9 @@ func (s *session) Read(p []byte) (int, error) {
 // Called from remotecommand whenever there is any output
 // If the TermMsg.MsgType was TermPing, then it would handle Proxy.HandlePing
 func (s *session) Write(p []byte) (int, error) {
-	klog.Info("session Write:", string(p))
+	zaplogger.Sugar().Infow("TerminalSession", "Write", string(p))
 	if err := s.websocketProxy.Send(websocket.BinaryMessage, p); err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return 0, err
 	}
 	return len(p), nil
@@ -236,9 +235,9 @@ func (s *session) Option() ExecOptions {
 }
 
 func (s *session) Close(reason string) {
-	klog.Infof("sessionId:%s close reason:%s", s.Id(), reason)
+	zaplogger.Sugar().Infow("TerminalSession trigger close", "sessionId", s.Id(), "reason", reason)
 	s.once.Do(func() {
-		klog.Infof("sessionId:%s close 222 reason:%s", s.Id(), reason)
+		zaplogger.Sugar().Infow("TerminalSession successfully close", "sessionId", s.Id(), "reason", reason)
 		s.cancel()
 	})
 }

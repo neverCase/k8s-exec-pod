@@ -3,11 +3,10 @@ package k8s_exec_pod
 import (
 	"context"
 	"fmt"
-	"sync"
-
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/klog/v2"
+	"sync"
 )
 
 const (
@@ -47,7 +46,7 @@ func (sh *sessionHub) New(option ExecOptions) (s Session, err error) {
 	sh.items[s.Id()] = s
 	go func() {
 		if err := sh.Listen(s); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 		}
 	}()
 	return s, nil
