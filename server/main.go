@@ -15,8 +15,12 @@ func main() {
 	flag.Parse()
 	defer zaplogger.Sync()
 	stopCh := signals.SetupSignalHandler()
-	_ = exec.InitServer(context.Background(), *proxyservice, *kubeconfig, *masterUrl)
+	zaplogger.Sugar().Info("k8s-exec-pod is starting")
+	s := exec.InitServer(context.Background(), *proxyservice, *kubeconfig, *masterUrl)
+	zaplogger.Sugar().Info("k8s-exec-pod is running")
 	<-stopCh
-
+	zaplogger.Sugar().Info("k8s-exec-pod trigger shutdown")
+	s.ShutDown()
 	<-stopCh
+	zaplogger.Sugar().Info("k8s-exec-pod shutdown gracefully")
 }
