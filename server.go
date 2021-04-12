@@ -36,7 +36,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 	router.GET(RouterPodShellToken, h.PodToken)
 	router.GET(RouterSSH, h.SSH)
 	router.GET(RouterLog, h.LogStream)
-	router.GET(RouterLog, h.LogDownload)
+	router.GET(RouterPodLogDownload, h.LogDownload)
 	h.server = &http.Server{
 		Addr:    addr,
 		Handler: router,
@@ -66,6 +66,7 @@ func (s *Server) PodToken(c *gin.Context) {
 		Namespace:     c.Param("namespace"),
 		PodName:       c.Param("pod"),
 		ContainerName: c.Param("container"),
+		Follow:        true,
 		Command:       []string{c.Param("command")},
 	}
 	var res HttpResponse
@@ -113,7 +114,7 @@ func (s *Server) LogStream(c *gin.Context) {
 	go session.HandleLog(proxy)
 }
 
-//RouterPodLogDownload = "/namespace/:namespace/pod/:pod/:container/previous/:previous/SinceSeconds/:SinceSeconds/SinceTime/:sinceTime"
+//RouterPodLogDownload = "/namespace/:namespace/pod/:pod/:container/previous/:previous/SinceSeconds/:SinceSeconds/SinceTime/:SinceTime"
 
 func (s *Server) LogDownload(c *gin.Context) {
 	pre, err := strconv.ParseBool(c.Param("previous"))
@@ -126,6 +127,7 @@ func (s *Server) LogDownload(c *gin.Context) {
 		Namespace:       c.Param("namespace"),
 		PodName:         c.Param("pod"),
 		ContainerName:   c.Param("container"),
+		Follow:          false,
 		UsePreviousLogs: pre,
 	}
 	// check SinceSeconds and SinceTime
@@ -147,6 +149,12 @@ func (s *Server) LogDownload(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	defer func() {
+		zaplogger.Sugar().Info("LogTransmit readCloser close")
+		if err := reader.Close(); err != nil {
+			zaplogger.Sugar().Error(err)
+		}
+	}()
 	fileContentDisposition := fmt.Sprintf("attachment;filename=%s_%s_%s.log", c.Param("namespace"), c.Param("pod"), c.Param("container"))
 	c.Header("Content-Type", "text/plain")
 	c.Header("Content-Disposition", fileContentDisposition)
