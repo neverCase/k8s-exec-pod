@@ -32,7 +32,7 @@ type Session interface {
 	Wait()
 	HandleLog(p Proxy)
 	HandleSSH(p Proxy)
-	Option() ExecOptions
+	Option() *ExecOptions
 	Close(reason string)
 	Ctx() context.Context
 	ReadCloser(rc io.ReadCloser)
@@ -46,7 +46,7 @@ const (
 )
 
 // NewSession returns a new Session Interface
-func NewSession(ctx context.Context, connTimeout int64, k8sClient kubernetes.Interface, cfg *rest.Config, option ExecOptions) (Session, error) {
+func NewSession(ctx context.Context, connTimeout int64, k8sClient kubernetes.Interface, cfg *rest.Config, option *ExecOptions) (Session, error) {
 	sessionId, err := genTerminalSessionId()
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ type session struct {
 	connTimeout int64
 	expireTime  time.Time
 
-	option ExecOptions
+	option *ExecOptions
 
 	sizeChan chan remotecommand.TerminalSize
 
@@ -230,7 +230,7 @@ func (s *session) Next() *remotecommand.TerminalSize {
 	}
 }
 
-func (s *session) Option() ExecOptions {
+func (s *session) Option() *ExecOptions {
 	return s.option
 }
 

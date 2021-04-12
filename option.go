@@ -1,6 +1,9 @@
 package k8s_exec_pod
 
-import "io"
+import (
+	"io"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // ExecOptions passed to ExecWithOptions
 type ExecOptions struct {
@@ -9,7 +12,10 @@ type ExecOptions struct {
 	PodName       string
 	ContainerName string
 
+	Follow          bool
 	UsePreviousLogs bool
+	SinceSeconds    *int64
+	SinceTime       *metav1.Time
 
 	Stdin         io.Reader
 	CaptureStdout bool

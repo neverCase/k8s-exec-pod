@@ -14,7 +14,7 @@ const (
 )
 
 type SessionHub interface {
-	New(option ExecOptions) (s Session, err error)
+	New(option *ExecOptions) (s Session, err error)
 	Get(sessionId string) (s Session, err error)
 	Close(sessionId string, reason string) error
 	Listen(session Session) error
@@ -36,7 +36,7 @@ type sessionHub struct {
 	cfg       *rest.Config
 }
 
-func (sh *sessionHub) New(option ExecOptions) (s Session, err error) {
+func (sh *sessionHub) New(option *ExecOptions) (s Session, err error) {
 	sh.mu.Lock()
 	defer sh.mu.Unlock()
 	s, err = NewSession(context.Background(), 10, sh.k8sClient, sh.cfg, option)

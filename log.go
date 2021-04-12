@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func openStream(k8sClient kubernetes.Interface, option ExecOptions) (io.ReadCloser, error) {
+func openStream(k8sClient kubernetes.Interface, option *ExecOptions) (io.ReadCloser, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(env.DefaultExecutionDuration))
 	rc, err := k8sClient.CoreV1().RESTClient().Get().
 		Resource("pods").
@@ -50,4 +50,8 @@ func LogTransmit(k8sClient kubernetes.Interface, session Session) error {
 	zaplogger.Sugar().Infof("LogTransmit trigger session.Close session:%s reason:%s", session.Id(), ReasonStreamStopped)
 	session.Close(ReasonStreamStopped)
 	return nil
+}
+
+func LogDownload(k8sClient kubernetes.Interface, option *ExecOptions) (io.ReadCloser, error) {
+	return openStream(k8sClient, option)
 }
