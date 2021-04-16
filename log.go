@@ -3,16 +3,13 @@ package k8s_exec_pod
 import (
 	"context"
 	"github.com/Shanghai-Lunara/pkg/zaplogger"
-	"github.com/nevercase/k8s-controller-custom-resource/pkg/env"
 	"io"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	"time"
 )
 
 func openStream(k8sClient kubernetes.Interface, option *ExecOptions) (io.ReadCloser, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(env.DefaultExecutionDuration))
 	rc, err := k8sClient.CoreV1().RESTClient().Get().
 		Resource("pods").
 		Namespace(option.Namespace).
@@ -23,8 +20,7 @@ func openStream(k8sClient kubernetes.Interface, option *ExecOptions) (io.ReadClo
 			Follow:     option.Follow,
 			Previous:   option.UsePreviousLogs,
 			Timestamps: false,
-		}, scheme.ParameterCodec).Stream(ctx)
-	cancel()
+		}, scheme.ParameterCodec).Stream(context.Background())
 	return rc, err
 }
 
