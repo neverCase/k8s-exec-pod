@@ -1,5 +1,5 @@
 # k8s-exec-pod
-This is a simple and easy way for you to execute commands inside a k8s pod, watch logs and even download logs with specific container name through the websocket proxy.
+This is a simple and easy way for you to execute commands inside a k8s pod, watch logs through the websocket proxy and even download logs with specific container name.
 
 ## Notice
 - A terminal is not just an input field. 
