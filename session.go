@@ -211,8 +211,10 @@ func (s *session) Read(p []byte) (int, error) {
 // Called from remotecommand whenever there is any output
 // If the TermMsg.MsgType was TermPing, then it would handle Proxy.HandlePing
 func (s *session) Write(p []byte) (int, error) {
-	zaplogger.Sugar().Infow("TerminalSession", "Write", string(p))
-	if err := s.websocketProxy.Send(websocket.BinaryMessage, p); err != nil {
+	//zaplogger.Sugar().Infow("TerminalSession", "Write", string(p))
+	data := make([]byte, len(p))
+	copy(data, p)
+	if err := s.websocketProxy.Send(websocket.BinaryMessage, data); err != nil {
 		zaplogger.Sugar().Error(err)
 		return 0, err
 	}

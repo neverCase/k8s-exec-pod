@@ -158,7 +158,7 @@ func (p *proxy) Close() {
 }
 
 func (p *proxy) Recv() (*message, error) {
-	zaplogger.Sugar().Info("proxy Recv message")
+	//zaplogger.Sugar().Info("proxy Recv message")
 	select {
 	case msg, isClose := <-p.readChan:
 		if !isClose {
