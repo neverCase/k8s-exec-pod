@@ -172,7 +172,7 @@ const EndOfTransmission = "\u0004"
 // Read handles pty->process messages (stdin, resize)
 // Called in a loop from remotecommand as long as the process is running
 func (s *session) Read(p []byte) (int, error) {
-	zaplogger.Sugar().Infow("TerminalSession", "Read", string(p))
+	//zaplogger.Sugar().Infow("TerminalSession", "Read", string(p))
 	if n, err := s.websocketProxy.LoadBuffers(p); err != nil {
 		return 0, err
 	} else {
