@@ -35,7 +35,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 	router.Use(cors.Default())
 	router.GET(RouterPodShellToken, h.PodToken)
 	router.GET(RouterSSH, h.SSH)
-	router.GET(RouterPodLogStreaming, h.LogStream)
+	router.GET(RouterPodLogStream, h.LogStream)
 	router.GET(RouterPodLogDownload, h.LogDownload)
 	h.server = &http.Server{
 		Addr:    addr,
