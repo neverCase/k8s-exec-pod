@@ -16,10 +16,12 @@ func openStream(k8sClient kubernetes.Interface, option *ExecOptions) (io.ReadClo
 		Name(option.PodName).
 		SubResource("log").
 		VersionedParams(&corev1.PodLogOptions{
-			Container:  option.ContainerName,
-			Follow:     option.Follow,
-			Previous:   option.UsePreviousLogs,
-			Timestamps: false,
+			Container:    option.ContainerName,
+			Follow:       option.Follow,
+			Previous:     option.UsePreviousLogs,
+			Timestamps:   false,
+			SinceSeconds: option.SinceSeconds,
+			//SinceTime:    option.SinceTime,
 		}, scheme.ParameterCodec).Stream(context.Background())
 	return rc, err
 }

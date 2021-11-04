@@ -35,7 +35,7 @@ func InitServer(ctx context.Context, addr, kubeconfig, masterUrl string) *Server
 	router.Use(cors.Default())
 	router.GET(RouterPodShellToken, h.PodToken)
 	router.GET(RouterSSH, h.SSH)
-	router.GET(RouterLog, h.LogStream)
+	router.GET(RouterPodLogStreaming, h.LogStream)
 	router.GET(RouterPodLogDownload, h.LogDownload)
 	h.server = &http.Server{
 		Addr:    addr,
@@ -111,10 +111,28 @@ func (s *Server) LogStream(c *gin.Context) {
 		zaplogger.Sugar().Error(err)
 		return
 	}
+	if err = setOptionWithSince(c, session.Option()); err != nil {
+		c.Abort()
+		return
+	}
 	go session.HandleLog(proxy)
 }
 
-//RouterPodLogDownload = "/namespace/:namespace/pod/:pod/:container/previous/:previous/SinceSeconds/:SinceSeconds/SinceTime/:SinceTime"
+func setOptionWithSince(c *gin.Context, opt *ExecOptions) error {
+	// check `sinceSeconds` and `sinceTime`
+	sinceSec, err := strconv.Atoi(c.Param("sinceSeconds"))
+	if err != nil {
+		zaplogger.Sugar().Errorw("Convert sinceSeconds failed", "SinceSeconds", c.Param("sinceSeconds"), "err", err)
+		return err
+	}
+	if sinceSec > 0 {
+		a := int64(sinceSec)
+		opt.SinceSeconds = &a
+		opt.SinceTime = nil
+	} else {
+	}
+	return nil
+}
 
 func (s *Server) LogDownload(c *gin.Context) {
 	pre, err := strconv.ParseBool(c.Param("previous"))
@@ -130,18 +148,9 @@ func (s *Server) LogDownload(c *gin.Context) {
 		Follow:          false,
 		UsePreviousLogs: pre,
 	}
-	// check SinceSeconds and SinceTime
-	sinceSec, err := strconv.Atoi(c.Param("SinceSeconds"))
-	if err != nil {
-		zaplogger.Sugar().Errorw("Convert SinceSeconds failed", "SinceSeconds", c.Param("SinceSeconds"), "err", err)
+	if err = setOptionWithSince(c, option); err != nil {
 		c.Abort()
 		return
-	}
-	if sinceSec > 0 {
-		a := int64(sinceSec)
-		option.SinceSeconds = &a
-		option.SinceTime = nil
-	} else {
 	}
 	reader, err := LogDownload(s.k8sClient, option)
 	if err != nil {
