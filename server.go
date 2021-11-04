@@ -120,9 +120,9 @@ func (s *Server) LogStream(c *gin.Context) {
 
 func setOptionWithSince(c *gin.Context, opt *ExecOptions) error {
 	// check `sinceSeconds` and `sinceTime`
-	sinceSec, err := strconv.Atoi(c.Param("sinceSeconds"))
+	sinceSec, err := strconv.Atoi(c.Param("SinceSeconds"))
 	if err != nil {
-		zaplogger.Sugar().Errorw("Convert sinceSeconds failed", "SinceSeconds", c.Param("sinceSeconds"), "err", err)
+		zaplogger.Sugar().Errorw("Convert sinceSeconds failed", "SinceSeconds", c.Param("SinceSeconds"), "err", err)
 		return err
 	}
 	if sinceSec > 0 {
