@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/gorilla/websocket"
-	"github.com/nevercase/k8s-controller-custom-resource/pkg/signals"
 	"io/ioutil"
-	"k8s.io/klog/v2"
 	"log"
 	"net/http"
 	"net/url"
 	"time"
 
 	exec "github.com/nevercase/k8s-exec-pod"
+
+	"github.com/TyrandeCloud/signals/pkg/signals"
+	"github.com/gorilla/websocket"
+	"k8s.io/klog/v2"
 )
 
 var (
