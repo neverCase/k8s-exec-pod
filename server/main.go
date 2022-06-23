@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"github.com/Shanghai-Lunara/pkg/zaplogger"
-	"github.com/nevercase/k8s-controller-custom-resource/pkg/signals"
+	"github.com/TyrandeCloud/signals/pkg/signals"
 	exec "github.com/nevercase/k8s-exec-pod"
 )
 
