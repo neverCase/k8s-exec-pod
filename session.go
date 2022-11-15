@@ -184,7 +184,7 @@ func (s *session) Read(p []byte) (int, error) {
 	var err error
 	if wsMsg, err = s.websocketProxy.Recv(); err != nil {
 		zaplogger.Sugar().Error(err)
-		return 0, err
+		return copy(p, EndOfTransmission), err
 	}
 
 	var msg TermMsg
